@@ -25,6 +25,7 @@ begin :: proc() {
     "Hello, World!",
     options = {window_mode = .Windowed_Resizable, anti_alias = true},
   )
+  k2.set_cursor_visible(false)
 
   Game_load()
 }
@@ -45,7 +46,7 @@ end :: proc() {
 
 step :: proc(dt: f32 = 0) -> bool {
   k2.update() or_return
-  if g.desktop && k2.key_went_down(.Escape) do return false
+  if g.state.current == .Quit do return false
   if k2.key_went_down(.B) do toggle_shader()
 
   g.dpi = k2.get_window_scale()
@@ -57,22 +58,28 @@ step :: proc(dt: f32 = 0) -> bool {
 
   resize_render_texture()
 
-  k2.set_shader(g.sprite_shader)
   k2.set_camera(g.camera)
   k2.set_render_texture(g.render_texture)
-  k2.clear(k2.BLACK)
+  k2.set_shader(g.sprite_shader)
   Game_update()
   k2.set_shader(nil)
+
   k2.set_camera(k2.Camera{zoom = g.camera.zoom})
   Game_ui()
-  k2.set_render_texture(nil)
+
+  k2.set_shader(g.sprite_shader)
+  draw_cursor()
+
   k2.set_camera(nil)
+  k2.set_render_texture(nil)
+  k2.set_shader(nil)
 
   k2.set_shader(g.crt_shader)
   // k2.draw_texture(g.render_texture.texture, 0)
   k2.clear(k2.BLACK)
   k2.draw_texture_fit(g.render_texture.texture, g.render_source, g.render_dest)
   k2.set_shader(nil)
+  Game_state_transition()
   k2.present()
 
   free_all(context.temp_allocator)

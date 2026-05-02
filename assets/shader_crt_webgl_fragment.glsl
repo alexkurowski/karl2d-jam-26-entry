@@ -12,7 +12,7 @@ uniform float time;
 uniform float curve;
 uniform float blur;
 
-const vec2 resolution = vec2(256.0, 192.0);
+const vec2 resolution = vec2(160.0, 128.0);
 const float mask_scale = 1.2;
 
 // const float raw_weights[] = float[](
