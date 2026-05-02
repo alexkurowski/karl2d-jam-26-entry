@@ -43,13 +43,13 @@ end :: proc() {
   mem.tracking_allocator_destroy(&g.alloc)
 }
 
-step :: proc() -> bool {
+step :: proc(dt: f32 = 0) -> bool {
   k2.update() or_return
   if g.desktop && k2.key_went_down(.Escape) do return false
   if k2.key_went_down(.B) do toggle_shader()
 
   g.dpi = k2.get_window_scale()
-  g.dt = k2.get_frame_time()
+  g.dt = dt == 0 ? k2.get_frame_time() : dt
   g.t += g.dt
   g.input = get_input()
 
@@ -132,8 +132,8 @@ toggle_shader :: proc() {
     k2.set_shader_constant(g.crt_shader, g.crt_shader.constant_lookup["blur"], f32(0))
     is_on = false
   } else {
-    k2.set_shader_constant(g.crt_shader, g.crt_shader.constant_lookup["curve"], f32(0.033))
-    k2.set_shader_constant(g.crt_shader, g.crt_shader.constant_lookup["blur"], f32(0.02))
+    k2.set_shader_constant(g.crt_shader, g.crt_shader.constant_lookup["curve"], f32(CRT_CURVE))
+    k2.set_shader_constant(g.crt_shader, g.crt_shader.constant_lookup["blur"], f32(CRT_BLUR))
     is_on = true
   }
 }

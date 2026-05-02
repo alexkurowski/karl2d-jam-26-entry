@@ -3,8 +3,10 @@ package game
 
 import k2 "../karl2d"
 import "core:fmt"
+import "core:math/rand"
 
 Vec2 :: [2]f32
+Grid2 :: [2]i32
 Rect :: k2.Rect
 Color :: k2.Color
 
@@ -39,6 +41,10 @@ is_hovered :: proc(rect: Rect) -> bool {
 
 is_clicked :: proc(rect: Rect) -> bool {
   return k2.point_in_rect(g.input.mouse_screen, rect) && k2.mouse_button_went_down(.Left)
+}
+
+rand_f :: proc(min: f32 = 0, max: f32 = 1) -> f32 {
+  return rand.float32_range(min, max)
 }
 
 p :: proc(value: any, name := #caller_expression(value)) {

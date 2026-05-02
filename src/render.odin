@@ -70,10 +70,6 @@ draw_button :: proc(label: string, pos: Vec2, origin: Button_Origin = .TopLeft) 
   return click
 }
 
-Sprite :: enum {
-  Character,
-}
-
 SpriteColor :: enum u8 {
   Black,
   DarkBlue,
@@ -93,9 +89,38 @@ SpriteColor :: enum u8 {
   LightPeach,
 }
 
-sprite_index := [Sprite]Rect {
-  .Character = Rect{1 * 8 + 1 * 1, 0 * 8 + 0 * 1, 8, 8}, // index = 1
+Sprite :: enum {
+  Character,
+  Sword,
+  Enemy1,
+  Enemy2,
+  Enemy3,
+  Grass0,
+  Grass1,
+  Grass2,
+  Wall0,
+  Wall1,
+  Heart0,
+  Heart1,
 }
+
+// odinfmt: disable
+sprite_index := [Sprite]Rect {
+  // X Y coords:     v        v         |  v        v
+  .Character = Rect{ 1 * 8 +  1 * 1 + 1,   0 * 8 +  0 * 1 + 1, 8, 8},
+  .Sword     = Rect{12 * 8 + 12 * 1 + 1,   9 * 8 +  9 * 1 + 1, 8, 8},
+  .Enemy1    = Rect{13 * 8 + 13 * 1 + 1,  13 * 8 + 13 * 1 + 1, 8, 8},
+  .Enemy2    = Rect{12 * 8 + 12 * 1 + 1,  13 * 8 + 13 * 1 + 1, 8, 8},
+  .Enemy3    = Rect{14 * 8 + 14 * 1 + 1,  13 * 8 + 13 * 1 + 1, 8, 8},
+  .Grass0    = Rect{ 0 * 8 +  0 * 1 + 1,   0 * 8 +  0 * 1 + 1, 8, 8},
+  .Grass1    = Rect{ 0 * 8 +  0 * 1 + 1,   2 * 8 +  2 * 1 + 1, 8, 8},
+  .Grass2    = Rect{ 1 * 8 +  1 * 1 + 1,   2 * 8 +  2 * 1 + 1, 8, 8},
+  .Wall0     = Rect{ 0 * 8 +  0 * 1 + 1,   0 * 8 +  0 * 1 + 1, 8, 8},
+  .Wall1     = Rect{ 0 * 8 +  0 * 1 + 1,  10 * 8 + 10 * 1 + 1, 8, 8},
+  .Heart1    = Rect{ 3 * 8 +  3 * 1 + 1,   0 * 8 +  0 * 1 + 1, 8, 8},
+  .Heart0    = Rect{ 3 * 8 +  3 * 1 + 1,   1 * 8 +  1 * 1 + 1, 8, 8},
+}
+// odinfmt: enable
 
 draw_sprite :: proc(
   spr: Sprite,
@@ -104,5 +129,13 @@ draw_sprite :: proc(
   mg: SpriteColor = .Red,
   bg: SpriteColor = .Black,
 ) {
-  k2.draw_texture_rect(g.texture, sprite_index[spr], pos, tint = [4]u8{u8(fg), u8(mg), u8(bg), 1})
+  PAD :: 0.001
+  SIZE :: 8 + PAD * 2
+  dest := Rect{pos.x - PAD, pos.y - PAD, SIZE, SIZE}
+  k2.draw_texture_fit(g.texture, sprite_index[spr], dest, tint = [4]u8{u8(fg), u8(mg), u8(bg), 1})
 }
+
+draw_ui_sprite :: proc(spr: Sprite, pos: Vec2, tint: [4]u8 = k2.WHITE) {
+  k2.draw_texture_rect(g.texture, sprite_index[spr], pos, tint = tint)
+}
+
