@@ -22,7 +22,7 @@ begin :: proc() {
   k2.init(
     SCREEN_WIDTH * SCREEN_ZOOM,
     SCREEN_HEIGHT * SCREEN_ZOOM,
-    "Hello, World!",
+    "Reach the castle",
     options = {window_mode = .Windowed_Resizable, anti_alias = true},
   )
   k2.set_cursor_visible(false)

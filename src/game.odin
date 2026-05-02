@@ -39,21 +39,7 @@ Game :: struct {
   tiles:          [MAP_SIZE][MAP_SIZE]Tile,
   entities:       [dynamic; 256]Entity,
   room:           [dynamic; 4]Entity,
-  player:         struct {
-    position:     Grid2,
-    offset:       Vec2,
-    hp:           i32,
-    armor:        i32,
-    weapon:       i32,
-    loot:         i32,
-    kills:        i32,
-    shake_hp:     f32,
-    shake_armor:  f32,
-    shake_weapon: f32,
-    shake_loot:   f32,
-    input_delay:  f32,
-    room_delay:   f32,
-  },
+  player:         Player,
   menu:           struct {
     game_started: bool,
     options:      bool,
@@ -108,19 +94,27 @@ Game_set_state :: proc(next_state: Game_State) {
 }
 
 Game_start_new_game :: proc() {
-  // Generate map
-  for i := i32(0); i < MAP_SIZE; i += 1 {
-    for j := i32(0); j < MAP_SIZE; j += 1 {
-      r, rr: f32 = rand_f(), rand_f()
-      kind: TileKind
-      if r < 0.3 {
-        kind = rr < 0.33 ? .Woods0 : rr < 0.66 ? .Woods1 : .Woods2
-      } else {
-        kind = rr < 0.33 ? .Grass0 : rr < 0.66 ? .Grass1 : .Grass2
-      }
+  {
+    // Reset player
+    g.player = Player {
+      hp = 20,
+    }
+  }
+  {
+    // Generate map
+    for i := i32(0); i < MAP_SIZE; i += 1 {
+      for j := i32(0); j < MAP_SIZE; j += 1 {
+        r, rr: f32 = rand_f(), rand_f()
+        kind: TileKind
+        if r < 0.3 {
+          kind = rr < 0.33 ? .Woods0 : rr < 0.66 ? .Woods1 : .Woods2
+        } else {
+          kind = rr < 0.33 ? .Grass0 : rr < 0.66 ? .Grass1 : .Grass2
+        }
 
-      g.tiles[i][j] = Tile {
-        kind = kind,
+        g.tiles[i][j] = Tile {
+          kind = kind,
+        }
       }
     }
   }
@@ -229,17 +223,112 @@ Game_start_new_game :: proc() {
     Tile_clear(g.player.position.x, g.player.position.y)
   }
   {
-    // TODO: place castle for player to reach
+    // Place castle opposite of player
+    a, b, c: Grid2
+    px := g.player.position.x
+    py := g.player.position.y
+    mid := i32(MAP_SIZE / 2)
+    if px < mid && py < mid {
+      c = {MAP_SIZE - 2, MAP_SIZE - 2}
+      b = c
+      a = b - {3, 3}
+    } else if px >= mid && py < mid {
+      c = {1, MAP_SIZE - 2}
+      a = c - {0, 3}
+      b = c + {3, 0}
+    } else if px < mid && py >= mid {
+      c = {MAP_SIZE - 2, 1}
+      a = c - {3, 0}
+      b = c + {0, 3}
+    } else if px >= mid && py >= mid {
+      c = {1, 1}
+      a = c
+      b = c + {3, 3}
+    }
+
+    possible_positions: [dynamic; 16]Grid2
+    for i := a.x; i <= b.x; i += 1 {
+      for j := a.y; j <= b.y; j += 1 {
+        if Tile_is_walkable(i, j) {
+          append(&possible_positions, Grid2{i, j})
+        }
+      }
+    }
+
+    rand.shuffle(possible_positions[:])
+    pos := possible_positions[0]
+    g.tiles[pos.x][pos.y].kind = .Castle
+    g.tiles[pos.x][pos.y].clear = true
   }
   {
     // Generate entities
-    clear(&g.entities)
-    for i := i32(1); i <= 14; i += 1 {
+    Entity_generate()
+  }
+
+  Game_set_state(.Map)
+}
+
+Game_start_new_room :: proc() {
+  rand.shuffle(g.entities[:])
+
+  clear(&g.room)
+  append(&g.room, pop(&g.entities))
+  append(&g.room, pop(&g.entities))
+  append(&g.room, pop(&g.entities))
+  append(&g.room, pop(&g.entities))
+
+  if len(g.entities) <= 4 {
+    Entity_generate()
+  }
+
+  Game_set_state(.Room)
+}
+
+Player :: struct {
+  position:     Grid2,
+  offset:       Vec2,
+  hp:           i32,
+  armor:        i32,
+  weapon:       i32,
+  loot:         i32,
+  kills:        i32,
+  shake_hp:     f32,
+  shake_armor:  f32,
+  shake_weapon: f32,
+  shake_loot:   f32,
+  input_delay:  f32,
+  room_delay:   f32,
+  fled_before:  bool,
+}
+
+Entity :: struct {
+  kind:  EntityKind,
+  value: i32,
+  clear: bool,
+}
+
+EntityKind :: enum {
+  Enemy1,
+  Enemy2,
+  Enemy3,
+  Weapon,
+  Heal,
+  Armor,
+  Loot,
+}
+
+Entity_generate :: proc() {
+  clear(&g.entities)
+  for n := 0; n < 4; n += 1 {
+    top: i32 = n == 0 ? 14 : 10
+    for i := i32(1); i <= top; i += 1 {
       if i < 8 {
         append(&g.entities, Entity{.Enemy1, i, false})
         append(&g.entities, Entity{.Enemy1, i, false})
-        append(&g.entities, Entity{.Enemy1, i, false})
-        append(&g.entities, Entity{.Enemy1, i, false})
+        if n == 0 {
+          append(&g.entities, Entity{.Enemy1, i, false})
+          append(&g.entities, Entity{.Enemy1, i, false})
+        }
       }
       if i >= 4 {
         append(&g.entities, Entity{.Enemy2, i, false})
@@ -260,55 +349,8 @@ Game_start_new_game :: proc() {
       append(&g.entities, Entity{.Loot, i, false})
       append(&g.entities, Entity{.Loot, i, false})
     }
-    p(len(g.entities))
-    for i := 0; i < 4; i += 1 {
-      rand.shuffle(g.entities[:])
-    }
   }
-
-  {
-    // Reset player
-    g.player.offset = 0
-    g.player.hp = 20
-    g.player.armor = 0
-    g.player.weapon = 0
-    g.player.loot = 0
-    g.player.kills = 0
-    g.player.shake_hp = 0
-    g.player.shake_armor = 0
-    g.player.shake_weapon = 0
-    g.player.shake_loot = 0
-  }
-
-  Game_set_state(.Map)
-}
-
-Game_start_new_room :: proc() {
   rand.shuffle(g.entities[:])
-
-  clear(&g.room)
-  append(&g.room, pop(&g.entities))
-  append(&g.room, pop(&g.entities))
-  append(&g.room, pop(&g.entities))
-  append(&g.room, pop(&g.entities))
-
-  Game_set_state(.Room)
-}
-
-Entity :: struct {
-  kind:  EntityKind,
-  value: i32,
-  clear: bool,
-}
-
-EntityKind :: enum {
-  Enemy1,
-  Enemy2,
-  Enemy3,
-  Weapon,
-  Heal,
-  Armor,
-  Loot,
 }
 
 Entity_interact :: proc(entity: ^Entity) {
@@ -323,10 +365,10 @@ Entity_interact :: proc(entity: ^Entity) {
       value -= weapon_lost
       g.player.shake_weapon = 0.5
     }
-    if value < 0 {
+    if value <= 0 {
       Message_show(fmt.tprintf("You slained enemy effortlessly"))
       entity.clear = true
-      break
+      return
     }
     // Spend armor
     if g.player.armor > 0 {
@@ -336,10 +378,10 @@ Entity_interact :: proc(entity: ^Entity) {
       value -= armor_lost
       g.player.shake_armor = 0.5
     }
-    if value < 0 {
+    if value <= 0 {
       Message_show(fmt.tprintf("You slained enemy effortlessly"))
       entity.clear = true
-      break
+      return
     }
     // Spend hp
     g.player.hp -= value
@@ -355,16 +397,19 @@ Entity_interact :: proc(entity: ^Entity) {
     g.player.shake_weapon = 0.3
     Message_show(fmt.tprintf("You found a weapon"))
     entity.clear = true
+
   case .Heal:
     g.player.hp = math.min(g.player.hp + entity.value, 20)
     g.player.shake_hp = 0.3
     Message_show(fmt.tprintf("You restored %v health", entity.value))
     entity.clear = true
+
   case .Armor:
     g.player.armor = math.min(g.player.armor + entity.value, 20)
     g.player.shake_armor = 0.3
     Message_show(fmt.tprintf("You got %v armor", entity.value))
     entity.clear = true
+
   case .Loot:
     g.player.loot += entity.value
     g.player.shake_loot = 0.3
@@ -391,6 +436,7 @@ TileKind :: enum {
   Woods2,
   Water0,
   Water1,
+  Castle,
 }
 
 Tile_is_valid :: proc(x, y: i32) -> bool {
@@ -404,7 +450,13 @@ Tile_is_border :: proc(x, y: i32) -> bool {
 Tile_is_walkable :: proc(x, y: i32) -> bool {
   Tile_is_valid(x, y) or_return
   k := g.tiles[x][y].kind
-  if k == .Grass0 || k == .Grass1 || k == .Grass2 || k == .Woods0 || k == .Woods1 || k == .Woods2 {
+  if k == .Grass0 ||
+     k == .Grass1 ||
+     k == .Grass2 ||
+     k == .Woods0 ||
+     k == .Woods1 ||
+     k == .Woods2 ||
+     k == .Castle {
     return true
   }
   return false
@@ -462,6 +514,8 @@ Tile_draw :: proc(tile: Tile, pos: Grid2) {
     draw_sprite({0, 0}, pos, .DarkBlue, .DarkBlue, .DarkBlue, .DarkBlue)
   case .Water1:
     draw_sprite({13, 7}, pos, .LightBlue, .Blue, .DarkBlue, .DarkBlue)
+  case .Castle:
+    draw_sprite({11, 8}, pos, .LightBlue, .LightGray, .Gray, .DarkGreen)
   }
 
   // if !tile.clear {
@@ -648,11 +702,14 @@ Game_Map_update :: proc() {
       new_position := g.player.position + dir
       if Tile_is_walkable(new_position.x, new_position.y) {
         g.player.position = new_position
-        g.player.offset -= g.input.movement * 8
+        g.player.offset -= Vec2{f32(dir.x), f32(dir.y)} * 8
         Tile_reveal(new_position.x, new_position.y)
 
         if !g.tiles[g.player.position.x][g.player.position.y].clear {
           g.player.input_delay = 0.66
+        } else if g.tiles[g.player.position.x][g.player.position.y].kind == .Castle {
+          g.player.input_delay = 0.99
+          g.t = 0
         } else {
           g.player.input_delay = 0.13
           g.t = 0
@@ -667,6 +724,10 @@ Game_Map_update :: proc() {
 
       if g.player.input_delay <= 0 && !g.tiles[g.player.position.x][g.player.position.y].clear {
         Game_start_new_room()
+      }
+      if g.player.input_delay <= 0 &&
+         g.tiles[g.player.position.x][g.player.position.y].kind == .Castle {
+        Game_set_state(.Win)
       }
     } else if !Game_in_transition() {
       if g.input.movement != 0 {
@@ -740,6 +801,7 @@ Game_Map_update :: proc() {
     // Draw player
     player_blink := math.cos(g.t * 5) < -0.85
     if !player_blink {
+      // Head
       draw_sprite_offset(
         {1, 0},
         g.player.position + {x, y},
@@ -749,6 +811,7 @@ Game_Map_update :: proc() {
         .DarkBlue,
         .DarkGray,
       )
+      // Torso
       draw_sprite_offset(
         {13, 15},
         g.player.position + {x, y + 1},
@@ -758,7 +821,6 @@ Game_Map_update :: proc() {
         .DarkBlue,
         .DarkGray,
       )
-
     }
   }
 
@@ -796,10 +858,19 @@ Game_Room_update :: proc() {
       c0, c1, c2, c3 = .LightGray, .Gray, .Gray, .Dark
       creature = true
     case .Weapon:
-      spr = {12, 9}
+      if value >= 6 {
+        spr = {12, 8}
+      } else {
+        spr = {12, 9}
+      }
     case .Heal:
-      spr = {13, 8}
-      c0, c1, c2, c3 = .Light, .Red, .DarkRed, .Dark
+      if value >= 6 {
+        spr = {13, 8}
+        c0, c1, c2, c3 = .Light, .Red, .DarkRed, .Dark
+      } else {
+        spr = {15, 9}
+        c0, c1, c2, c3 = .Light, .Red, .DarkRed, .Dark
+      }
     case .Armor:
       spr = {13, 9}
     case .Loot:
@@ -819,7 +890,7 @@ Game_Room_update :: proc() {
       draw_sprite(spr, pos, c0, c1, c2, c3)
     }
   }
-  get_entity_name :: proc(kind: EntityKind) -> string {
+  get_entity_name :: proc(kind: EntityKind, value: i32) -> string {
     switch kind {
     case .Enemy1:
       return "Toad"
@@ -828,7 +899,11 @@ Game_Room_update :: proc() {
     case .Enemy3:
       return "Skeleton"
     case .Weapon:
-      return "Sword"
+      if value >= 6 {
+        return "Battle axe"
+      } else {
+        return "Sword"
+      }
     case .Heal:
       return "Potion"
     case .Armor:
@@ -840,27 +915,33 @@ Game_Room_update :: proc() {
   }
 
   draw_entity :: proc(e: ^Entity, pos: Grid2) {
-    hover := is_hovered_grid(pos + {-1, -1}, pos + {4, 4})
+    draw_text_outline_centered(get_entity_name(e.kind, e.value), pos + {1, 3})
+    draw_text_outline_centered(fmt.tprintf("%v", e.value), pos + {1, 4})
+
+    hover := is_hovered_grid(pos + {-1, -1}, pos + {3, 4})
+    // Card colors
+    colors :: proc() -> (Sprite_Color, Sprite_Color, Sprite_Color, Sprite_Color) {
+      return .LightBrown, .Gray, .Dark, .DarkRed
+    }
     // Draw border corners
-    draw_sprite({3, 10}, pos + {0, 0})
-    draw_sprite({5, 10}, pos + {2, 0})
-    draw_sprite({5, 12}, pos + {2, 2})
-    draw_sprite({3, 12}, pos + {0, 2})
+    draw_sprite({3, 10}, pos + {0, 0}, colors())
+    draw_sprite({5, 10}, pos + {2, 0}, colors())
+    draw_sprite({5, 12}, pos + {2, 2}, colors())
+    draw_sprite({3, 12}, pos + {0, 2}, colors())
     // Draw border sides
-    draw_sprite({0, 8}, pos + {0, 1})
-    draw_sprite({0, 9}, pos + {2, 1})
-    draw_sprite({1, 9}, pos + {1, 0})
+    draw_sprite({0, 8}, pos + {0, 1}, colors())
+    draw_sprite({0, 9}, pos + {2, 1}, colors())
+    draw_sprite({1, 9}, pos + {1, 0}, colors())
+    draw_sprite({1, 8}, pos + {1, 2}, colors())
+    // Center
+    draw_sprite({4, 11}, pos + {1, 1}, colors())
+
     if hover {
-      draw_sprite({14, 1}, pos + {1, 2})
+      draw_sprite_offset({14, 1}, pos + {1, 2}, {0, 2})
       g.cursor = .Pointer
-    } else {
-      draw_sprite({1, 8}, pos + {1, 2})
     }
     // Draw entity sprite
     draw_entity_sprite(e.kind, e.value, pos + {1, 1})
-
-    draw_text_outline_centered(get_entity_name(e.kind), pos + {1, 3})
-    draw_text_outline_centered(fmt.tprintf("%v", e.value), pos + {1, 4})
 
     if hover && g.input.mouse_click {
       Entity_interact(e)
@@ -871,16 +952,14 @@ Game_Room_update :: proc() {
 
   {
     // Draw entities in the room
-    entity_count := 0
-    positions := [4]Grid2{{3, 2}, {9, 2}, {3, 8}, {9, 8}}
+    positions := [4]Grid2{{3, 2}, {9, 2}, {3, 9}, {9, 9}}
 
     for i := 0; i < 4; i += 1 {
       if g.room[i].clear do continue
       draw_entity(&g.room[i], positions[i])
-      entity_count += 1
     }
 
-    if entity_count == 0 && g.player.room_delay <= 0 {
+    if count_entities_in_room() == 0 && g.player.room_delay <= 0 {
       g.player.room_delay = 0.3
     }
   }
@@ -888,6 +967,7 @@ Game_Room_update :: proc() {
   if g.player.room_delay > 0 {
     g.player.room_delay -= g.dt
     if g.player.room_delay <= 0 {
+      g.player.fled_before = false
       g.tiles[g.player.position.x][g.player.position.y].clear = true
       Game_set_state(.Map)
     }
@@ -897,19 +977,18 @@ Game_Room_update :: proc() {
   draw_message()
 
   if can_flee() {
-    draw_text_outline("Flee", {16, 12})
-    if g.input.mouse_click && is_hovered_grid({15, 11}, {18, 13}) {
+    hover := is_hovered_grid({15, 11}, {18, 13})
+    if hover {
+      draw_sprite({12, 1}, {15, 12})
+      draw_sprite({13, 1}, {18, 12})
+    }
+    draw_text_outline_offset("Flee", {16, 12}, {-1, 0})
+    if hover && g.input.mouse_click {
+      g.player.fled_before = count_enemies_in_room() > 0
       g.tiles[g.player.position.x][g.player.position.y].clear = true
       Game_set_state(.Map)
     }
   }
-
-  // x, y: i32 = 1, 6
-  // for i := 0; i < len(g.room); i += 1 {
-  //   if g.room[i].clear do continue
-  //   draw_entity(&g.room[i], {x, y})
-  //   x += 5
-  // }
 
   if k2.key_went_down(.Q) {
     Game_set_state(.Map)
@@ -946,8 +1025,28 @@ can_continue :: proc() -> bool {
 }
 
 can_flee :: proc() -> bool {
-  // TODO DBG
-  return true
+  return count_enemies_in_room() <= 1 || !g.player.fled_before
+}
+
+count_enemies_in_room :: proc() -> i32 {
+  result := i32(0)
+  for i := 0; i < 4; i += 1 {
+    if g.room[i].clear do continue
+    k := g.room[i].kind
+    if k == .Enemy1 || k == .Enemy2 || k == .Enemy3 {
+      result += 1
+    }
+  }
+  return result
+}
+
+count_entities_in_room :: proc() -> i32 {
+  result := i32(0)
+  for i := 0; i < 4; i += 1 {
+    if g.room[i].clear do continue
+    result += 1
+  }
+  return result
 }
 
 draw_player_stats :: proc() {
