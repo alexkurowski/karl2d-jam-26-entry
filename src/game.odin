@@ -53,6 +53,7 @@ Game :: struct {
     gameover_blood: [8]i32,
   },
   message:        Message,
+  debug:          bool,
 }
 
 g: Game
@@ -979,17 +980,18 @@ Game_Map_update :: proc() {
   }
 
   draw_player_stats()
-  draw_message()
 
-  // DBG
-  if k2.key_went_down(.R) {
-    Game_start_new_game()
-  }
-  if k2.key_went_down(.M) {
-    Game_set_state(.Win)
-  }
-  if k2.key_went_down(.N) {
-    Game_set_state(.Gameover)
+  if g.debug {
+    // DBG
+    if k2.key_went_down(.R) {
+      Game_start_new_game()
+    }
+    if k2.key_went_down(.M) {
+      Game_set_state(.Win)
+    }
+    if k2.key_went_down(.N) {
+      Game_set_state(.Gameover)
+    }
   }
 }
 
@@ -1155,7 +1157,6 @@ Game_Room_update :: proc() {
   }
 
   draw_player_stats()
-  draw_message()
 
   if can_flee() && count_entities_in_room() > 0 {
     hover := is_hovered_grid({15, 11}, {18, 13})
@@ -1176,8 +1177,11 @@ Game_Room_update :: proc() {
     }
   }
 
-  if k2.key_went_down(.Q) {
-    Game_set_state(.Map)
+  if g.debug {
+    // DBG
+    if k2.key_went_down(.Q) {
+      Game_set_state(.Map)
+    }
   }
 }
 

@@ -1,7 +1,7 @@
 // This program builds a Karl2D game as a web version.
 //
 // Usage:
-//    odin run build_web -- directory_name 
+//    odin run build_web -- directory_name
 //
 // For example:
 //    odin run build_web -- examples/minimal_web
@@ -64,7 +64,7 @@ main :: proc() {
 	fmt.ensuref(dir_stat.type == .Directory, "%v is not a directory!", dir)
 
 	dir_name := dir_stat.name
-	
+
 	path_join :: proc(parts: []string) -> string {
 		p, err := os.join_path(parts, allocator = context.allocator)
 		fmt.ensuref(err == nil, "Failed joining path: %v", err)

@@ -48,7 +48,15 @@ step :: proc(dt: f32 = 0) -> bool {
   k2.update() or_return
   if g.state.current == .Quit do return false
   if k2.key_went_down(.B) do toggle_shader()
-  update_music()
+
+  if k2.key_went_down(.Slash) {
+    g.debug = !g.debug
+    if g.debug {
+      Message_show("Debug mode: on")
+    } else {
+      Message_show("Debug mode: off")
+    }
+  }
 
   g.dpi = k2.get_window_scale()
   g.dt = dt == 0 ? k2.get_frame_time() : dt
@@ -57,12 +65,14 @@ step :: proc(dt: f32 = 0) -> bool {
 
   // k2.set_shader_constant(g.shader, g.shader_time, g.t)
 
+  update_music()
   resize_render_texture()
 
   k2.set_camera(g.camera)
   k2.set_render_texture(g.render_texture)
   k2.set_shader(g.sprite_shader)
   Game_update()
+  draw_message()
   k2.set_shader(nil)
 
   k2.set_camera(k2.Camera{zoom = g.camera.zoom})

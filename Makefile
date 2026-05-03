@@ -30,11 +30,6 @@ build_debug:
 	mkdir -p ${OUT_PATH}
 	odin build ${SRC_PATH} -debug ${OUT_OPT}
 
-prod: build_production
-build_production:
-	mkdir -p ${OUT_PATH}
-	odin build ${SRC_PATH} -o:speed ${OUT_OPT}
-
 t: test
 test:
 	odin test ${SRC_PATH}
@@ -43,6 +38,13 @@ w: build_web
 web: build_web
 build_web:
 	odin run ./tasks/build_web -- ./src
+	mkdir -p ./bin/web
+	mv ./src/bin/web/* ./bin/web/
+	rm -r ./src/bin
+	rm -r ./src/build
+
+prod:
+	odin run ./tasks/build_web -- ./src -o:size
 	mkdir -p ./bin/web
 	mv ./src/bin/web/* ./bin/web/
 	rm -r ./src/bin
