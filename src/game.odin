@@ -740,10 +740,9 @@ Game_Menu_init :: proc() {
   g.menu.options = false
   g.menu.prev_hover_id = -1
 
-  reach, the, castle := rand_f(), rand_f(), rand_f()
   for i := 0; i < 14; i += 1 {
     color := Sprite_Color.Light
-    r := i < 5 ? reach : i < 8 ? the : castle
+    r := rand_f()
     if r < 0.1 {
       color = .LightGreen
     } else if r < 0.5 {
@@ -785,27 +784,51 @@ Game_Menu_update :: proc() {
     return clicked
   }
 
+  if k2.key_went_down(.R) {
+  for i := 0; i < 14; i += 1 {
+    color := Sprite_Color.Light
+    r := rand_f()
+    if r < 0.1 {
+      color = .LightGreen
+    } else if r < 0.4 {
+      color = .LightBlue
+    } else if r < 0.5 {
+      color = .LightBrown
+    } else if r < 0.7 {
+      color = .Light
+    }
+    g.menu.title_color[i] = color
+  }
+
+  }
   {
+    // Head
+    draw_sprite_offset({1, 0}, {10, 8}, {4, 1}, .Blue, .LightBlue, .DarkBlue, .DarkGray)
+    // Torso
+    draw_sprite_offset({13, 15}, {10, 9}, {4, 1}, .Blue, .LightBlue, .DarkBlue, .DarkGray)
+
     // Draw logo
-    draw_sprite({2, 5}, {13, 2}, g.menu.title_color[0])
-    draw_sprite({5, 4}, {14, 2}, g.menu.title_color[1])
-    draw_sprite({1, 4}, {15, 2}, g.menu.title_color[2])
-    draw_sprite({3, 4}, {16, 2}, g.menu.title_color[3])
-    draw_sprite({8, 4}, {17, 2}, g.menu.title_color[4])
+    draw_sprite_offset({2, 5}, {9, 5},{-4,0}, g.menu.title_color[0])
+    draw_sprite_offset({5, 4}, {10, 5},{-4,0}, g.menu.title_color[1])
+    draw_sprite_offset({1, 4}, {11, 5},{-4,0}, g.menu.title_color[2])
+    draw_sprite_offset({3, 4}, {12, 5},{-4,0}, g.menu.title_color[3])
+    draw_sprite_offset({8, 4}, {13, 5},{-4,0}, g.menu.title_color[4])
 
-    draw_sprite({4, 5}, {15, 3}, g.menu.title_color[5])
-    draw_sprite({8, 4}, {16, 3}, g.menu.title_color[6])
-    draw_sprite({5, 4}, {17, 3}, g.menu.title_color[7])
+    draw_sprite_offset({4, 5}, {10, 6},{-4,0}, g.menu.title_color[5])
+    draw_sprite_offset({8, 4}, {11, 6},{-4,0}, g.menu.title_color[6])
+    draw_sprite_offset({5, 4}, {12, 6},{-4,0}, g.menu.title_color[7])
 
-    draw_sprite({3, 4}, {12, 4}, g.menu.title_color[8])
-    draw_sprite({1, 4}, {13, 4}, g.menu.title_color[9])
-    draw_sprite({3, 5}, {14, 4}, g.menu.title_color[10])
-    draw_sprite({4, 5}, {15, 4}, g.menu.title_color[11])
-    draw_sprite({12, 4}, {16, 4}, g.menu.title_color[12])
-    draw_sprite({5, 4}, {17, 4}, g.menu.title_color[13])
+    draw_sprite({3, 4}, {8, 7}, g.menu.title_color[8])
+    draw_sprite({1, 4}, {9, 7}, g.menu.title_color[9])
+    draw_sprite({3, 5}, {10, 7}, g.menu.title_color[10])
+    draw_sprite({4, 5}, {11, 7}, g.menu.title_color[11])
+    draw_sprite({12, 4}, {12, 7}, g.menu.title_color[12])
+    draw_sprite({5, 4}, {13, 7}, g.menu.title_color[13])
   }
 
   hovering_something = false
+
+  if (false) {
 
   if !g.menu.options {
     if can_continue() {
@@ -839,6 +862,7 @@ Game_Menu_update :: proc() {
     if btn(6, "Back", {2, 13}) {
       g.menu.options = false
     }
+  }
   }
 
   if !hovering_something {
