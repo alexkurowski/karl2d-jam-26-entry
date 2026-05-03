@@ -787,43 +787,43 @@ Game_Menu_update :: proc() {
   if k2.key_went_down(.R) {
   for i := 0; i < 14; i += 1 {
     color := Sprite_Color.Light
-    r := rand_f()
-    if r < 0.1 {
-      color = .LightGreen
-    } else if r < 0.4 {
-      color = .LightBlue
-    } else if r < 0.5 {
-      color = .LightBrown
-    } else if r < 0.7 {
-      color = .Light
-    }
-    g.menu.title_color[i] = color
+    // r := rand_f()
+    // if r < 0.1 {
+    //   color = .LightGreen
+    // } else if r < 0.4 {
+    //   color = .LightBlue
+    // } else if r < 0.5 {
+    //   color = .LightBrown
+    // } else if r < 0.7 {
+    //   color = .Light
+    // }
+    g.menu.title_color[i] = i < 5 ? .Light : i < 8 ? .LightGreen : .LightBlue
   }
 
   }
   {
     // Head
-    draw_sprite_offset({1, 0}, {10, 8}, {4, 1}, .Blue, .LightBlue, .DarkBlue, .DarkGray)
+    draw_sprite_offset({1, 0}, {9, 8}, {4, 1}, .Blue, .LightBlue, .DarkBlue, .DarkGray)
     // Torso
-    draw_sprite_offset({13, 15}, {10, 9}, {4, 1}, .Blue, .LightBlue, .DarkBlue, .DarkGray)
+    draw_sprite_offset({13, 15}, {9, 9}, {4, 1}, .Blue, .LightBlue, .DarkBlue, .DarkGray)
 
     // Draw logo
-    draw_sprite_offset({2, 5}, {9, 5},{-4,0}, g.menu.title_color[0])
-    draw_sprite_offset({5, 4}, {10, 5},{-4,0}, g.menu.title_color[1])
-    draw_sprite_offset({1, 4}, {11, 5},{-4,0}, g.menu.title_color[2])
-    draw_sprite_offset({3, 4}, {12, 5},{-4,0}, g.menu.title_color[3])
-    draw_sprite_offset({8, 4}, {13, 5},{-4,0}, g.menu.title_color[4])
+    draw_sprite_offset({2, 5}, {8, 5},{-4,0}, g.menu.title_color[0])
+    draw_sprite_offset({5, 4}, {9, 5},{-4,0}, g.menu.title_color[1])
+    draw_sprite_offset({1, 4}, {10, 5},{-4,0}, g.menu.title_color[2])
+    draw_sprite_offset({3, 4}, {11, 5},{-4,0}, g.menu.title_color[3])
+    draw_sprite_offset({8, 4}, {12, 5},{-4,0}, g.menu.title_color[4])
 
-    draw_sprite_offset({4, 5}, {10, 6},{-4,0}, g.menu.title_color[5])
-    draw_sprite_offset({8, 4}, {11, 6},{-4,0}, g.menu.title_color[6])
-    draw_sprite_offset({5, 4}, {12, 6},{-4,0}, g.menu.title_color[7])
+    draw_sprite_offset({4, 5}, {9, 6},{-4,0}, g.menu.title_color[5])
+    draw_sprite_offset({8, 4}, {10, 6},{-4,0}, g.menu.title_color[6])
+    draw_sprite_offset({5, 4}, {11, 6},{-4,0}, g.menu.title_color[7])
 
-    draw_sprite({3, 4}, {8, 7}, g.menu.title_color[8])
-    draw_sprite({1, 4}, {9, 7}, g.menu.title_color[9])
-    draw_sprite({3, 5}, {10, 7}, g.menu.title_color[10])
-    draw_sprite({4, 5}, {11, 7}, g.menu.title_color[11])
-    draw_sprite({12, 4}, {12, 7}, g.menu.title_color[12])
-    draw_sprite({5, 4}, {13, 7}, g.menu.title_color[13])
+    draw_sprite({3, 4}, {7, 7}, g.menu.title_color[8])
+    draw_sprite({1, 4}, {8, 7}, g.menu.title_color[9])
+    draw_sprite({3, 5}, {9, 7}, g.menu.title_color[10])
+    draw_sprite({4, 5}, {10, 7}, g.menu.title_color[11])
+    draw_sprite({12, 4}, {11, 7}, g.menu.title_color[12])
+    draw_sprite({5, 4}, {12, 7}, g.menu.title_color[13])
   }
 
   hovering_something = false
