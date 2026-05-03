@@ -41,8 +41,10 @@ Game :: struct {
   room:           [dynamic; 4]Entity,
   player:         Player,
   menu:           struct {
-    game_started: bool,
-    options:      bool,
+    game_started:   bool,
+    options:        bool,
+    win_jump_t:     f32,
+    gameover_blood: [8]i32,
   },
   message:        Message,
 }
@@ -296,8 +298,11 @@ Player :: struct {
   shake_armor:  f32,
   shake_weapon: f32,
   shake_loot:   f32,
+  had_armor:    bool,
+  had_weapon:   bool,
   input_delay:  f32,
   room_delay:   f32,
+  room_cleared: bool,
   fled_before:  bool,
 }
 
@@ -366,7 +371,8 @@ Entity_interact :: proc(entity: ^Entity) {
       g.player.shake_weapon = 0.5
     }
     if value <= 0 {
-      Message_show(fmt.tprintf("You slained enemy effortlessly"))
+      // Message_show(fmt.tprintf("You slain enemy effortlessly"))
+      g.player.kills += 1
       entity.clear = true
       return
     }
@@ -379,41 +385,67 @@ Entity_interact :: proc(entity: ^Entity) {
       g.player.shake_armor = 0.5
     }
     if value <= 0 {
-      Message_show(fmt.tprintf("You slained enemy effortlessly"))
+      // Message_show(fmt.tprintf("You slain enemy effortlessly"))
+      g.player.kills += 1
       entity.clear = true
       return
     }
     // Spend hp
-    g.player.hp -= value
+    hp_before := g.player.hp
+    g.player.hp = math.max(g.player.hp - value, 0)
+    hp_lost := hp_before - g.player.hp
+    value -= hp_lost
     g.player.shake_hp = 0.5
+    if value <= 0 {
+      g.player.kills += 1
+      entity.clear = true
+    }
+    // Check if player died
     if g.player.hp <= 0 {
       g.player.hp = 0
       Game_set_state(.Gameover)
     }
-    entity.clear = true
 
   case .Weapon:
     g.player.weapon += entity.value
     g.player.shake_weapon = 0.3
+    g.player.had_weapon = true
     Message_show(fmt.tprintf("You found a weapon"))
     entity.clear = true
 
   case .Heal:
+    hp_before := g.player.hp
     g.player.hp = math.min(g.player.hp + entity.value, 20)
+    hp_gain := g.player.hp - hp_before
     g.player.shake_hp = 0.3
-    Message_show(fmt.tprintf("You restored %v health", entity.value))
+    if hp_gain == entity.value {
+      Message_show(fmt.tprintf("You restored %v health", hp_gain))
+    } else if hp_gain <= 0 {
+      Message_show("You are already at full health")
+    } else {
+      Message_show(fmt.tprintf("You restored %v health", hp_gain))
+    }
     entity.clear = true
 
   case .Armor:
+    armor_before := g.player.armor
     g.player.armor = math.min(g.player.armor + entity.value, 20)
+    armor_gain := g.player.armor - armor_before
     g.player.shake_armor = 0.3
-    Message_show(fmt.tprintf("You got %v armor", entity.value))
+    g.player.had_armor = true
+    if armor_gain == entity.value {
+      Message_show(fmt.tprintf("You got %v armor", armor_gain))
+    } else if armor_gain <= 0 {
+      Message_show("You can't wear any more armor")
+    } else {
+      Message_show(fmt.tprintf("You got %v armor", armor_gain))
+    }
     entity.clear = true
 
   case .Loot:
     g.player.loot += entity.value
     g.player.shake_loot = 0.3
-    Message_show(fmt.tprintf("You found %v coins", entity.value))
+    Message_show(fmt.tprintf("You found $%v!", entity.value))
     entity.clear = true
   }
 }
@@ -793,10 +825,10 @@ Game_Map_update :: proc() {
       draw_sprite({1, 14}, {x + i, y - 1}, border_color())
       draw_sprite({1, 12}, {x + i, y + MAP_SIZE}, border_color())
     }
-    draw_sprite({1, 13}, {x - 1, y - 1}, border_color())
-    draw_sprite({1, 13}, {x + MAP_SIZE, y - 1}, border_color())
-    draw_sprite({1, 13}, {x + MAP_SIZE, y + MAP_SIZE}, border_color())
-    draw_sprite({1, 13}, {x - 1, y + MAP_SIZE}, border_color())
+    draw_sprite({2, 14}, {x - 1, y - 1}, border_color())
+    draw_sprite({0, 14}, {x + MAP_SIZE, y - 1}, border_color())
+    draw_sprite({0, 12}, {x + MAP_SIZE, y + MAP_SIZE}, border_color())
+    draw_sprite({2, 12}, {x - 1, y + MAP_SIZE}, border_color())
 
     // Draw player
     player_blink := math.cos(g.t * 5) < -0.85
@@ -827,9 +859,15 @@ Game_Map_update :: proc() {
   draw_player_stats()
   draw_message()
 
+  // DBG
   if k2.key_went_down(.R) {
-    // DBG
     Game_start_new_game()
+  }
+  if k2.key_went_down(.M) {
+    Game_set_state(.Win)
+  }
+  if k2.key_went_down(.N) {
+    Game_set_state(.Gameover)
   }
 }
 
@@ -837,6 +875,7 @@ Game_Map_update :: proc() {
 
 Game_Room_init :: proc() {
   g.player.room_delay = 0
+  g.player.room_cleared = false
 }
 
 Game_Room_update :: proc() {
@@ -890,6 +929,7 @@ Game_Room_update :: proc() {
       draw_sprite(spr, pos, c0, c1, c2, c3)
     }
   }
+
   get_entity_name :: proc(kind: EntityKind, value: i32) -> string {
     switch kind {
     case .Enemy1:
@@ -909,7 +949,11 @@ Game_Room_update :: proc() {
     case .Armor:
       return "Shield"
     case .Loot:
-      return "Loot"
+      if value >= 6 {
+        return "Treasure"
+      } else {
+        return "Coins"
+      }
     }
     return "Error"
   }
@@ -919,22 +963,33 @@ Game_Room_update :: proc() {
     draw_text_outline_centered(fmt.tprintf("%v", e.value), pos + {1, 4})
 
     hover := is_hovered_grid(pos + {-1, -1}, pos + {3, 4})
-    // Card colors
-    colors :: proc() -> (Sprite_Color, Sprite_Color, Sprite_Color, Sprite_Color) {
-      return .LightBrown, .Gray, .Dark, .DarkRed
+
+    {
+      // Card background
+      strong := e.value >= 10
+
+      // Card colors
+      colors :: proc(strong: bool) -> (Sprite_Color, Sprite_Color, Sprite_Color, Sprite_Color) {
+        if strong {
+          return .LightBrown, .Gray, .LightGray, .DarkRed
+        } else {
+          return .LightBrown, .Gray, .Gray, .DarkRed
+        }
+      }
+
+      // Draw border corners
+      draw_sprite({3, 10}, pos + {0, 0}, colors(strong))
+      draw_sprite({5, 10}, pos + {2, 0}, colors(strong))
+      draw_sprite({5, 12}, pos + {2, 2}, colors(strong))
+      draw_sprite({3, 12}, pos + {0, 2}, colors(strong))
+      // Draw border sides
+      draw_sprite({3, 11}, pos + {0, 1}, colors(strong))
+      draw_sprite({5, 11}, pos + {2, 1}, colors(strong))
+      draw_sprite({4, 10}, pos + {1, 0}, colors(strong))
+      draw_sprite({4, 12}, pos + {1, 2}, colors(strong))
+      // Center
+      draw_sprite({4, 11}, pos + {1, 1}, colors(strong))
     }
-    // Draw border corners
-    draw_sprite({3, 10}, pos + {0, 0}, colors())
-    draw_sprite({5, 10}, pos + {2, 0}, colors())
-    draw_sprite({5, 12}, pos + {2, 2}, colors())
-    draw_sprite({3, 12}, pos + {0, 2}, colors())
-    // Draw border sides
-    draw_sprite({0, 8}, pos + {0, 1}, colors())
-    draw_sprite({0, 9}, pos + {2, 1}, colors())
-    draw_sprite({1, 9}, pos + {1, 0}, colors())
-    draw_sprite({1, 8}, pos + {1, 2}, colors())
-    // Center
-    draw_sprite({4, 11}, pos + {1, 1}, colors())
 
     if hover {
       draw_sprite_offset({14, 1}, pos + {1, 2}, {0, 2})
@@ -947,6 +1002,8 @@ Game_Room_update :: proc() {
       Entity_interact(e)
     }
   }
+
+  g.player.room_cleared = count_enemies_in_room() <= 0
 
   k2.draw_rect(Rect{4, 4, 19 * 8, 15 * 8}, to_color(.DarkGray))
 
@@ -976,13 +1033,17 @@ Game_Room_update :: proc() {
   draw_player_stats()
   draw_message()
 
-  if can_flee() {
+  if can_flee() && count_entities_in_room() > 0 {
     hover := is_hovered_grid({15, 11}, {18, 13})
     if hover {
       draw_sprite({12, 1}, {15, 12})
       draw_sprite({13, 1}, {18, 12})
     }
-    draw_text_outline_offset("Flee", {16, 12}, {-1, 0})
+    if g.player.room_cleared {
+      draw_text_outline_offset("Skip", {16, 12}, {-1, 0})
+    } else {
+      draw_text_outline_offset("Flee", {16, 12}, {-1, 0})
+    }
     if hover && g.input.mouse_click {
       g.player.fled_before = count_enemies_in_room() > 0
       g.tiles[g.player.position.x][g.player.position.y].clear = true
@@ -998,19 +1059,138 @@ Game_Room_update :: proc() {
 //
 
 Game_Win_init :: proc() {
+  g.menu.game_started = false
+  g.menu.win_jump_t = 0
 }
 
 Game_Win_update :: proc() {
+  g.cursor = .Pointer
+
+  {
+    // You win text
+    // 01234567890123456789
+    //       YOU  WIN
+    t := g.t
+    ph := f32(0.1)
+    s := f32(3)
+    a := f32(4)
+
+    draw_sprite_offset({9, 5}, {6, 4}, {0, math.sin(t * s) * a}, .LightBlue); t += ph
+    draw_sprite_offset({15, 4}, {7, 4}, {0, math.sin(t * s) * a}, .LightBlue); t += ph
+    draw_sprite_offset({5, 5}, {8, 4}, {0, math.sin(t * s) * a}, .LightBlue); t += ph
+
+    draw_sprite_offset({7, 5}, {11, 4}, {0, math.sin(t * s) * a}, .LightBlue); t += ph
+    draw_sprite_offset({9, 4}, {12, 4}, {0, math.sin(t * s) * a}, .LightBlue); t += ph
+    draw_sprite_offset({14, 4}, {13, 4}, {0, math.sin(t * s) * a}, .LightBlue); t += ph
+  }
+  {
+    y := math.sin(g.menu.win_jump_t * 8) * 4
+    if y < 0 do y = 0
+
+    offset: Vec2 = {4, 1}
+    if is_hovered_grid({8, 6}, {10, 9}) || y > 0 {
+      g.menu.win_jump_t += g.dt
+      offset.y -= y
+    }
+
+    // Head
+    draw_sprite_offset({1, 0}, {9, 7}, offset, .Blue, .LightBlue, .DarkBlue, .DarkGray)
+    // Torso
+    frame := int(math.round(g.t * 3)) % 4
+    spr: Grid2 = {13, 15}
+    if frame == 1 do spr = {12, 15}
+    if frame == 2 do spr = {13, 15}
+    if frame == 3 do spr = {14, 15}
+    draw_sprite_offset(spr, {9, 8}, offset, .Blue, .LightBlue, .DarkBlue, .DarkGray)
+  }
+  {
+    draw_sprite_offset({5, 1}, {8, 7}, {4, 2 + math.cos(g.t * 6) * 2}, .LightGreen)
+    draw_sprite_offset({6, 1}, {11, 7}, {-4, 2 + math.sin(g.t * 6) * 2}, .LightGreen)
+  }
+  {
+    draw_text_outline_centered(fmt.tprintf("Score: %v", g.player.loot), {9, 1})
+    draw_text_outline_centered(
+      "You safely reached the castle!",
+      {9, 10},
+      primary_color = .LightBlue,
+    )
+    draw_text_outline_centered(fmt.tprintf("You defeated %v enemies", g.player.kills), {9, 13})
+    draw_text_outline_centered("Thank you for playing!", {9, 14})
+  }
+
+  if g.input.mouse_click {
+    Game_set_state(.Menu)
+  }
 }
 
 //
 
 Game_Gameover_init :: proc() {
-
+  g.menu.game_started = false
+  for i := 0; i < 8; i += 1 {
+    r := rand_f()
+    if r < 0.5 {
+      g.menu.gameover_blood[i] = 0
+    } else if r > 0.9 {
+      g.menu.gameover_blood[i] = 3
+    } else {
+      g.menu.gameover_blood[i] = chance(0.5) ? 1 : 2
+    }
+  }
 }
 
 Game_Gameover_update :: proc() {
+  g.cursor = .Pointer
 
+  {
+    // Game over text
+    // 01234567890123456789
+    //      GAME  OVER
+    y := math.sin(g.t * 2) * 2
+
+    draw_sprite_offset({7, 4}, {5, 3}, {0, y}, .LightRed, c3 = .DarkRed)
+    draw_sprite_offset({1, 4}, {6, 3}, {0, y}, .LightRed, c3 = .DarkRed)
+    draw_sprite_offset({13, 4}, {7, 3}, {0, y}, .LightRed, c3 = .DarkRed)
+    draw_sprite_offset({5, 4}, {8, 3}, {0, y}, .LightRed, c3 = .DarkRed)
+
+    draw_sprite_offset({15, 4}, {11, 3}, {0, y}, .LightRed, c3 = .DarkRed)
+    draw_sprite_offset({6, 5}, {12, 3}, {0, y}, .LightRed, c3 = .DarkRed)
+    draw_sprite_offset({5, 4}, {13, 3}, {0, y}, .LightRed, c3 = .DarkRed)
+    draw_sprite_offset({2, 5}, {14, 3}, {0, y}, .LightRed, c3 = .DarkRed)
+
+    draw_blood :: proc(i: i32, pos: Grid2, offset: Vec2) {
+      if i == 1 {
+        draw_sprite_offset({10, 14}, pos, offset, .Red, .LightRed)
+      } else if i == 2 {
+        draw_sprite_offset({9, 14}, pos, offset, .Red, .LightRed)
+      } else if i == 3 {
+        draw_sprite_offset({10, 15}, pos, offset, .Red, .LightRed)
+      }
+    }
+    draw_blood(g.menu.gameover_blood[0], {5, 4}, {0, y})
+    draw_blood(g.menu.gameover_blood[1], {6, 4}, {0, y})
+    draw_blood(g.menu.gameover_blood[2], {7, 4}, {0, y})
+    draw_blood(g.menu.gameover_blood[3], {8, 4}, {0, y})
+
+    draw_blood(g.menu.gameover_blood[4], {11, 4}, {0, y})
+    draw_blood(g.menu.gameover_blood[5], {12, 4}, {0, y})
+    draw_blood(g.menu.gameover_blood[6], {13, 4}, {0, y})
+    draw_blood(g.menu.gameover_blood[7], {14, 4}, {0, y})
+  }
+  {
+    draw_text_outline_centered(fmt.tprintf("Score: %v", g.player.loot), {9, 7})
+    if g.player.kills == 1 {
+      draw_text_outline_centered(fmt.tprintf("You defeated %v enemy", g.player.kills), {9, 11})
+    } else {
+      draw_text_outline_centered(fmt.tprintf("You defeated %v enemies", g.player.kills), {9, 11})
+    }
+    draw_text_outline_centered("You were slain", {9, 13})
+    draw_text_outline_centered("Better luck next time!", {9, 14})
+  }
+
+  if g.input.mouse_click {
+    Game_set_state(.Menu)
+  }
 }
 
 //
@@ -1025,7 +1205,7 @@ can_continue :: proc() -> bool {
 }
 
 can_flee :: proc() -> bool {
-  return count_enemies_in_room() <= 1 || !g.player.fled_before
+  return count_enemies_in_room() <= (g.player.fled_before ? 0 : 1)
 }
 
 count_enemies_in_room :: proc() -> i32 {
@@ -1056,37 +1236,47 @@ draw_player_stats :: proc() {
     return Vec2{math.sin(v^ * 50) * 2, 0}
   }
 
+  y := i32(2)
+
   // HP
-  draw_sprite_offset({3, 0}, {16, 2}, {-3, 0} + shake(&g.player.shake_hp))
+  draw_sprite_offset({3, 0}, {16, y}, {-3, 0} + shake(&g.player.shake_hp))
   draw_text_outline_offset(
     fmt.tprintf("%v", g.player.hp),
-    {17, 2},
+    {17, y},
     {-1, 0} + shake(&g.player.shake_hp),
   )
+  y += 2
 
   // Armor
-  draw_sprite_offset({13, 9}, {16, 4}, {-3, 0} + shake(&g.player.shake_armor))
-  draw_text_outline_offset(
-    fmt.tprintf("%v", g.player.armor),
-    {17, 4},
-    {-1, 0} + shake(&g.player.shake_armor),
-  )
+  if g.player.had_armor {
+    draw_sprite_offset({13, 9}, {16, y}, {-3, 0} + shake(&g.player.shake_armor))
+    draw_text_outline_offset(
+      fmt.tprintf("%v", g.player.armor),
+      {17, y},
+      {-1, 0} + shake(&g.player.shake_armor),
+    )
+    y += 2
+  }
 
   // Weapon
-  draw_sprite_offset({12, 9}, {16, 6}, {-3, 0} + shake(&g.player.shake_weapon))
-  draw_text_outline_offset(
-    fmt.tprintf("%v", g.player.weapon),
-    {17, 6},
-    {-1, 0} + shake(&g.player.shake_weapon),
-  )
+  if g.player.had_weapon {
+    draw_sprite_offset({12, 9}, {16, y}, {-3, 0} + shake(&g.player.shake_weapon))
+    draw_text_outline_offset(
+      fmt.tprintf("%v", g.player.weapon),
+      {17, y},
+      {-1, 0} + shake(&g.player.shake_weapon),
+    )
+    y += 2
+  }
 
   // Loot
-  draw_sprite_offset({14, 7}, {16, 8}, {-3, 0} + shake(&g.player.shake_loot))
+  draw_sprite_offset({14, 7}, {16, y}, {-3, 0} + shake(&g.player.shake_loot))
   draw_text_outline_offset(
     fmt.tprintf("%v", g.player.loot),
-    {17, 8},
+    {17, y},
     {-1, 0} + shake(&g.player.shake_loot),
   )
+  y += 2
 }
 
 draw_message :: proc() {
@@ -1095,4 +1285,3 @@ draw_message :: proc() {
     draw_text_outline(g.message.text.?, {1, 14})
   }
 }
-
