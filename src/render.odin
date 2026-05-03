@@ -3,6 +3,29 @@ package game
 
 import k2 "../karl2d"
 
+Sprite_Color :: enum u8 {
+  // 0
+  Light,
+  LightRed,
+  Red,
+  DarkRed,
+  // 1
+  Dark,
+  LightBrown,
+  Brown,
+  DarkGreen,
+  // 2
+  Green,
+  LightGreen,
+  LightBlue,
+  Blue,
+  // 3
+  DarkBlue,
+  DarkGray,
+  Gray,
+  LightGray,
+}
+
 draw_text_outline :: proc(
   str: string,
   pos: Grid2,
@@ -73,12 +96,12 @@ draw_text_outline_centered :: proc(
   k2.draw_text(str, position + offset, font_size, primary_tint, font)
 }
 
-Button_Origin :: enum {
-  TopLeft,
-  TopRight,
-  BottomLeft,
-  BottomRight,
-}
+// Button_Origin :: enum {
+//   TopLeft,
+//   TopRight,
+//   BottomLeft,
+//   BottomRight,
+// }
 
 // draw_button :: proc(label: string, pos: Vec2, origin: Button_Origin = .TopLeft) -> bool {
 //   pad :: Vec2{8, 4}
@@ -120,29 +143,6 @@ Button_Origin :: enum {
 
 //   return click
 // }
-
-Sprite_Color :: enum u8 {
-  // 0
-  Light,
-  LightRed,
-  Red,
-  DarkRed,
-  // 1
-  Dark,
-  LightBrown,
-  Brown,
-  DarkGreen,
-  // 2
-  Green,
-  LightGreen,
-  LightBlue,
-  Blue,
-  // 3
-  DarkBlue,
-  DarkGray,
-  Gray,
-  LightGray,
-}
 
 to_color :: proc(c: Sprite_Color) -> [4]u8 {
   return [4]u8{u8(c), u8(c), u8(c), u8(c)}
@@ -216,4 +216,3 @@ draw_cursor :: proc() {
     .DarkGray,
   )
 }
-

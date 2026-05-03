@@ -28,6 +28,10 @@ Game :: struct {
   render_source:  Rect,
   render_dest:    Rect,
   font:           k2.Font,
+  sounds:         [Sound_Kind]k2.Sound,
+  disable_sounds: bool,
+  musics:         [Music_Kind]k2.Audio_Stream,
+  current_music:  Music_Kind,
   camera:         k2.Camera,
   state:          struct {
     current:    Game_State,
@@ -43,7 +47,9 @@ Game :: struct {
   menu:           struct {
     game_started:   bool,
     options:        bool,
+    prev_hover_id:  i32,
     win_jump_t:     f32,
+    title_color:    [14]Sprite_Color,
     gameover_blood: [8]i32,
   },
   message:        Message,
@@ -75,12 +81,60 @@ Game_load :: proc() {
   k2.set_shader_constant(g.crt_shader, g.crt_shader.constant_lookup["blur"], f32(CRT_BLUR))
   g.shader_time = g.crt_shader.constant_lookup["time"]
 
+  g.sounds[.Click] = k2.load_sound_from_bytes(#load("../assets/snd_hover.wav"))
+  g.sounds[.Kill] = k2.load_sound_from_bytes(#load("../assets/snd_kill2.wav"))
+  g.sounds[.Hurt] = k2.load_sound_from_bytes(#load("../assets/snd_kill.wav"))
+  g.sounds[.Gulp] = k2.load_sound_from_bytes(#load("../assets/snd_potion.wav"))
+  g.sounds[.Pick] = k2.load_sound_from_bytes(#load("../assets/snd_pick.wav"))
+  k2.set_sound_volume(g.sounds[.Pick], 0.5)
+  g.sounds[.Coin] = k2.load_sound_from_bytes(#load("../assets/snd_coin.wav"))
+  g.sounds[.Flee] = k2.load_sound_from_bytes(#load("../assets/snd_flee.wav"))
+  g.sounds[.Step0] = k2.load_sound_from_bytes(#load("../assets/snd_step0.wav"))
+  g.sounds[.Step1] = k2.load_sound_from_bytes(#load("../assets/snd_step1.wav"))
+  g.sounds[.Step2] = k2.load_sound_from_bytes(#load("../assets/snd_step2.wav"))
+  g.sounds[.Step3] = k2.load_sound_from_bytes(#load("../assets/snd_step3.wav"))
+  g.sounds[.Step4] = k2.load_sound_from_bytes(#load("../assets/snd_step4.wav"))
+  k2.set_sound_volume(g.sounds[.Step0], 0.5)
+  k2.set_sound_volume(g.sounds[.Step1], 0.5)
+  k2.set_sound_volume(g.sounds[.Step2], 0.5)
+  k2.set_sound_volume(g.sounds[.Step3], 0.5)
+  k2.set_sound_volume(g.sounds[.Step4], 0.5)
+  g.sounds[.Gameover] = k2.load_sound_from_bytes(#load("../assets/snd_gameover.wav"))
+  k2.set_sound_volume(g.sounds[.Gameover], 0.33)
+
+  g.musics[.Menu] = k2.load_audio_stream_from_bytes(#load("../assets/music_menu.ogg"))
+  g.musics[.Map] = k2.load_audio_stream_from_bytes(#load("../assets/music_room.ogg"))
+  g.musics[.Win] = k2.load_audio_stream_from_bytes(#load("../assets/music_win.ogg"))
+  k2.set_audio_stream_loop(g.musics[.Menu], true)
+  k2.set_audio_stream_loop(g.musics[.Map], true)
+  k2.set_audio_stream_loop(g.musics[.Win], true)
+
   g.state.transition = -STATE_TRANSITION_DURATION
   g.texture = k2.load_texture_from_bytes(#load("../assets/dungeon-mode-sheet.png"))
   g.font = k2.load_font_from_bytes(#load("../assets/tiny5.ttf"))
+
+  Game_Menu_init()
+  k2.play_audio_stream(g.musics[.Menu])
+  g.current_music = .Menu
 }
 
 Game_unload :: proc() {
+  k2.destroy_sound(g.sounds[.Click])
+  k2.destroy_sound(g.sounds[.Kill])
+  k2.destroy_sound(g.sounds[.Hurt])
+  k2.destroy_sound(g.sounds[.Flee])
+  k2.destroy_sound(g.sounds[.Gulp])
+  k2.destroy_sound(g.sounds[.Pick])
+  k2.destroy_sound(g.sounds[.Coin])
+  k2.destroy_sound(g.sounds[.Step0])
+  k2.destroy_sound(g.sounds[.Step1])
+  k2.destroy_sound(g.sounds[.Step2])
+  k2.destroy_sound(g.sounds[.Step3])
+  k2.destroy_sound(g.sounds[.Step4])
+  k2.destroy_sound(g.sounds[.Gameover])
+  k2.destroy_audio_stream(g.musics[.Menu])
+  k2.destroy_audio_stream(g.musics[.Map])
+  k2.destroy_audio_stream(g.musics[.Win])
   k2.destroy_render_texture(g.render_texture)
   k2.destroy_texture(g.texture)
   k2.destroy_font(g.font)
@@ -330,10 +384,8 @@ Entity_generate :: proc() {
       if i < 8 {
         append(&g.entities, Entity{.Enemy1, i, false})
         append(&g.entities, Entity{.Enemy1, i, false})
-        if n == 0 {
-          append(&g.entities, Entity{.Enemy1, i, false})
-          append(&g.entities, Entity{.Enemy1, i, false})
-        }
+        append(&g.entities, Entity{.Enemy1, i, false})
+        append(&g.entities, Entity{.Enemy1, i, false})
       }
       if i >= 4 {
         append(&g.entities, Entity{.Enemy2, i, false})
@@ -374,6 +426,7 @@ Entity_interact :: proc(entity: ^Entity) {
       // Message_show(fmt.tprintf("You slain enemy effortlessly"))
       g.player.kills += 1
       entity.clear = true
+      play_sound(.Kill)
       return
     }
     // Spend armor
@@ -388,6 +441,7 @@ Entity_interact :: proc(entity: ^Entity) {
       // Message_show(fmt.tprintf("You slain enemy effortlessly"))
       g.player.kills += 1
       entity.clear = true
+      play_sound(.Kill)
       return
     }
     // Spend hp
@@ -396,6 +450,7 @@ Entity_interact :: proc(entity: ^Entity) {
     hp_lost := hp_before - g.player.hp
     value -= hp_lost
     g.player.shake_hp = 0.5
+    play_sound(.Hurt)
     if value <= 0 {
       g.player.kills += 1
       entity.clear = true
@@ -410,6 +465,7 @@ Entity_interact :: proc(entity: ^Entity) {
     g.player.weapon += entity.value
     g.player.shake_weapon = 0.3
     g.player.had_weapon = true
+    play_sound(.Pick)
     Message_show(fmt.tprintf("You found a weapon"))
     entity.clear = true
 
@@ -418,6 +474,7 @@ Entity_interact :: proc(entity: ^Entity) {
     g.player.hp = math.min(g.player.hp + entity.value, 20)
     hp_gain := g.player.hp - hp_before
     g.player.shake_hp = 0.3
+    play_sound(.Gulp)
     if hp_gain == entity.value {
       Message_show(fmt.tprintf("You restored %v health", hp_gain))
     } else if hp_gain <= 0 {
@@ -433,6 +490,7 @@ Entity_interact :: proc(entity: ^Entity) {
     armor_gain := g.player.armor - armor_before
     g.player.shake_armor = 0.3
     g.player.had_armor = true
+    play_sound(.Pick)
     if armor_gain == entity.value {
       Message_show(fmt.tprintf("You got %v armor", armor_gain))
     } else if armor_gain <= 0 {
@@ -445,6 +503,7 @@ Entity_interact :: proc(entity: ^Entity) {
   case .Loot:
     g.player.loot += entity.value
     g.player.shake_loot = 0.3
+    play_sound(.Coin)
     Message_show(fmt.tprintf("You found $%v!", entity.value))
     entity.clear = true
   }
@@ -673,10 +732,31 @@ Game_Menu_init :: proc() {
     g.menu.game_started = false
   }
   g.menu.options = false
+  g.menu.prev_hover_id = -1
+
+  reach, the, castle := rand_f(), rand_f(), rand_f()
+  for i := 0; i < 14; i += 1 {
+    color := Sprite_Color.Light
+    r := i < 5 ? reach : i < 8 ? the : castle
+    if r < 0.1 {
+      color = .LightGreen
+    } else if r < 0.5 {
+      color = .LightBlue
+    } else if r < 0.5 {
+      color = .LightBrown
+    } else if r < 0.7 {
+      color = .Light
+    }
+    g.menu.title_color[i] = color
+  }
+
+  play_music(.Menu)
 }
 
 Game_Menu_update :: proc() {
-  btn :: proc(label: string, pos: Grid2) -> bool {
+  @(static) hovering_something: bool
+
+  btn :: proc(id: i32, label: string, pos: Grid2) -> bool {
     hovered := is_hovered_grid(pos, pos + {5, 0})
     clicked := hovered && g.input.mouse_click
 
@@ -687,37 +767,76 @@ Game_Menu_update :: proc() {
       draw_text_outline(label, pos)
     }
 
+    if hovered {
+      hovering_something = true
+
+      if g.menu.prev_hover_id != id {
+        g.menu.prev_hover_id = id
+        play_sound(.Click)
+      }
+    }
+
     return clicked
   }
 
+  {
+    // Draw logo
+    draw_sprite({2, 5}, {13, 2}, g.menu.title_color[0])
+    draw_sprite({5, 4}, {14, 2}, g.menu.title_color[1])
+    draw_sprite({1, 4}, {15, 2}, g.menu.title_color[2])
+    draw_sprite({3, 4}, {16, 2}, g.menu.title_color[3])
+    draw_sprite({8, 4}, {17, 2}, g.menu.title_color[4])
+
+    draw_sprite({4, 5}, {15, 3}, g.menu.title_color[5])
+    draw_sprite({8, 4}, {16, 3}, g.menu.title_color[6])
+    draw_sprite({5, 4}, {17, 3}, g.menu.title_color[7])
+
+    draw_sprite({3, 4}, {12, 4}, g.menu.title_color[8])
+    draw_sprite({1, 4}, {13, 4}, g.menu.title_color[9])
+    draw_sprite({3, 5}, {14, 4}, g.menu.title_color[10])
+    draw_sprite({4, 5}, {15, 4}, g.menu.title_color[11])
+    draw_sprite({12, 4}, {16, 4}, g.menu.title_color[12])
+    draw_sprite({5, 4}, {17, 4}, g.menu.title_color[13])
+  }
+
+  hovering_something = false
+
   if !g.menu.options {
     if can_continue() {
-      if btn("Continue", {2, 7}) {
+      if btn(0, "Continue", {2, 7}) {
         Game_set_state(.Map)
       }
     }
 
-    if btn("Start", {2, 9}) {
+    if btn(1, "Start", {2, 9}) {
       Game_start_new_game()
     }
 
-    if btn("Options", {2, 11}) {
+    if btn(2, "Options", {2, 11}) {
       g.menu.options = true
     }
 
     if g.desktop {
-      if btn("Quit", {2, 13}) {
+      if btn(3, "Quit", {2, 13}) {
         g.state.current = .Quit
       }
     }
   } else {
-    if btn("CRT effect", {2, 11}) {
+    if btn(4, is_sounds_enabled() ? "Sounds: on" : "Sounds: off", {2, 9}) {
+      toggle_sounds()
+    }
+
+    if btn(5, "CRT effect", {2, 11}) {
       toggle_shader()
     }
 
-    if btn("Back", {2, 13}) {
+    if btn(6, "Back", {2, 13}) {
       g.menu.options = false
     }
+  }
+
+  if !hovering_something {
+    g.menu.prev_hover_id = -1
   }
 }
 
@@ -725,6 +844,8 @@ Game_Menu_update :: proc() {
 
 Game_Map_init :: proc() {
   g.menu.game_started = true
+
+  play_music(.Map)
 }
 
 Game_Map_update :: proc() {
@@ -736,6 +857,7 @@ Game_Map_update :: proc() {
         g.player.position = new_position
         g.player.offset -= Vec2{f32(dir.x), f32(dir.y)} * 8
         Tile_reveal(new_position.x, new_position.y)
+        play_sound(.Step)
 
         if !g.tiles[g.player.position.x][g.player.position.y].clear {
           g.player.input_delay = 0.66
@@ -876,6 +998,8 @@ Game_Map_update :: proc() {
 Game_Room_init :: proc() {
   g.player.room_delay = 0
   g.player.room_cleared = false
+
+  // play_music(.Room)
 }
 
 Game_Room_update :: proc() {
@@ -1048,6 +1172,7 @@ Game_Room_update :: proc() {
       g.player.fled_before = count_enemies_in_room() > 0
       g.tiles[g.player.position.x][g.player.position.y].clear = true
       Game_set_state(.Map)
+      if !g.player.room_cleared do play_sound(.Flee)
     }
   }
 
@@ -1061,6 +1186,8 @@ Game_Room_update :: proc() {
 Game_Win_init :: proc() {
   g.menu.game_started = false
   g.menu.win_jump_t = 0
+
+  play_music(.Win)
 }
 
 Game_Win_update :: proc() {
@@ -1110,7 +1237,7 @@ Game_Win_update :: proc() {
   {
     draw_text_outline_centered(fmt.tprintf("Score: %v", g.player.loot), {9, 1})
     draw_text_outline_centered(
-      "You safely reached the castle!",
+      "You safely reached the castle",
       {9, 10},
       primary_color = .LightBlue,
     )
@@ -1137,6 +1264,9 @@ Game_Gameover_init :: proc() {
       g.menu.gameover_blood[i] = chance(0.5) ? 1 : 2
     }
   }
+
+  stop_music()
+  play_sound(.Gameover)
 }
 
 Game_Gameover_update :: proc() {

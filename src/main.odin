@@ -48,6 +48,7 @@ step :: proc(dt: f32 = 0) -> bool {
   k2.update() or_return
   if g.state.current == .Quit do return false
   if k2.key_went_down(.B) do toggle_shader()
+  update_music()
 
   g.dpi = k2.get_window_scale()
   g.dt = dt == 0 ? k2.get_frame_time() : dt
@@ -144,4 +145,3 @@ toggle_shader :: proc() {
     is_on = true
   }
 }
-
