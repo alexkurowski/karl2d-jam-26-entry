@@ -1,9 +1,9 @@
 package game
 
 import k2 "../karl2d"
-import "core:fmt"
+// import "core:fmt"
 import "core:math"
-import "core:mem"
+// import "core:mem"
 
 // Only called in desktop version
 main :: proc() {
@@ -16,14 +16,14 @@ main :: proc() {
 
 init :: begin // Web build alias
 begin :: proc() {
-  mem.tracking_allocator_init(&g.alloc, context.allocator)
-  context.allocator = mem.tracking_allocator(&g.alloc)
+  // mem.tracking_allocator_init(&g.alloc, context.allocator)
+  // context.allocator = mem.tracking_allocator(&g.alloc)
 
   k2.init(
     SCREEN_WIDTH * SCREEN_ZOOM,
     SCREEN_HEIGHT * SCREEN_ZOOM,
     "Reach the castle",
-    options = {window_mode = .Windowed_Resizable, anti_alias = true},
+    options = {window_mode = .Windowed_Resizable},
   )
   k2.set_cursor_visible(false)
 
@@ -34,14 +34,14 @@ end :: proc() {
   Game_unload()
   k2.shutdown()
 
-  if len(g.alloc.allocation_map) > 0 {
-    fmt.eprintf("=== %v allocations not freed: ===\n", len(g.alloc.allocation_map))
-    for _, entry in g.alloc.allocation_map {
-      fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
-    }
-  }
-
-  mem.tracking_allocator_destroy(&g.alloc)
+  // if len(g.alloc.allocation_map) > 0 {
+  //   fmt.eprintf("=== %v allocations not freed: ===\n", len(g.alloc.allocation_map))
+  //   for _, entry in g.alloc.allocation_map {
+  //     fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
+  //   }
+  // }
+  //
+  // mem.tracking_allocator_destroy(&g.alloc)
 }
 
 step :: proc(dt: f32 = 0) -> bool {

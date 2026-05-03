@@ -89,7 +89,9 @@ Game_load :: proc() {
   g.sounds[.Pick] = k2.load_sound_from_bytes(#load("../assets/snd_pick.wav"))
   k2.set_sound_volume(g.sounds[.Pick], 0.5)
   g.sounds[.Coin] = k2.load_sound_from_bytes(#load("../assets/snd_coin.wav"))
+  k2.set_sound_volume(g.sounds[.Coin], 0.6)
   g.sounds[.Flee] = k2.load_sound_from_bytes(#load("../assets/snd_flee.wav"))
+  k2.set_sound_volume(g.sounds[.Flee], 0.4)
   g.sounds[.Step0] = k2.load_sound_from_bytes(#load("../assets/snd_step0.wav"))
   g.sounds[.Step1] = k2.load_sound_from_bytes(#load("../assets/snd_step1.wav"))
   g.sounds[.Step2] = k2.load_sound_from_bytes(#load("../assets/snd_step2.wav"))
@@ -101,11 +103,14 @@ Game_load :: proc() {
   k2.set_sound_volume(g.sounds[.Step3], 0.5)
   k2.set_sound_volume(g.sounds[.Step4], 0.5)
   g.sounds[.Gameover] = k2.load_sound_from_bytes(#load("../assets/snd_gameover.wav"))
-  k2.set_sound_volume(g.sounds[.Gameover], 0.33)
+  k2.set_sound_volume(g.sounds[.Gameover], 0.1)
 
   g.musics[.Menu] = k2.load_audio_stream_from_bytes(#load("../assets/music_menu.ogg"))
   g.musics[.Map] = k2.load_audio_stream_from_bytes(#load("../assets/music_room.ogg"))
   g.musics[.Win] = k2.load_audio_stream_from_bytes(#load("../assets/music_win.ogg"))
+  k2.set_audio_stream_volume(g.musics[.Menu], 0.75)
+  k2.set_audio_stream_volume(g.musics[.Map], 0.75)
+  k2.set_audio_stream_volume(g.musics[.Win], 0.75)
   k2.set_audio_stream_loop(g.musics[.Menu], true)
   k2.set_audio_stream_loop(g.musics[.Map], true)
   k2.set_audio_stream_loop(g.musics[.Win], true)
@@ -1005,6 +1010,8 @@ Game_Room_init :: proc() {
 }
 
 Game_Room_update :: proc() {
+  @(static) hovering_something: bool
+
   draw_entity_sprite :: proc(kind: EntityKind, value: i32, pos: Grid2) {
     spr: Grid2
     c0, c1, c2, c3: Sprite_Color = .Light, .Red, .Green, .Dark
@@ -1084,7 +1091,7 @@ Game_Room_update :: proc() {
     return "Error"
   }
 
-  draw_entity :: proc(e: ^Entity, pos: Grid2) {
+  draw_entity :: proc(id: i32, e: ^Entity, pos: Grid2) {
     draw_text_outline_centered(get_entity_name(e.kind, e.value), pos + {1, 3})
     draw_text_outline_centered(fmt.tprintf("%v", e.value), pos + {1, 4})
 
@@ -1121,6 +1128,15 @@ Game_Room_update :: proc() {
       draw_sprite_offset({14, 1}, pos + {1, 2}, {0, 2})
       g.cursor = .Pointer
     }
+
+    if hover {
+      hovering_something = true
+
+      if g.menu.prev_hover_id != id {
+        g.menu.prev_hover_id = id
+        play_sound(.Click)
+      }
+    }
     // Draw entity sprite
     draw_entity_sprite(e.kind, e.value, pos + {1, 1})
 
@@ -1133,18 +1149,24 @@ Game_Room_update :: proc() {
 
   k2.draw_rect(Rect{4, 4, 19 * 8, 15 * 8}, to_color(.DarkGray))
 
+  hovering_something = false
+
   {
     // Draw entities in the room
     positions := [4]Grid2{{3, 2}, {9, 2}, {3, 9}, {9, 9}}
 
-    for i := 0; i < 4; i += 1 {
+    for i := i32(0); i < 4; i += 1 {
       if g.room[i].clear do continue
-      draw_entity(&g.room[i], positions[i])
+      draw_entity(i, &g.room[i], positions[i])
     }
 
     if count_entities_in_room() == 0 && g.player.room_delay <= 0 {
       g.player.room_delay = 0.3
     }
+  }
+
+  if !hovering_something {
+    g.menu.prev_hover_id = -1
   }
 
   if g.player.room_delay > 0 {

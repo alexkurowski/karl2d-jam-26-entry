@@ -9,14 +9,20 @@ import "base:runtime"
 ctx: runtime.Context
 
 main :: proc() {
-	// Disabled until Odin fixes logger on web again.
-	//context.logger = log.create_console_logger()
-	ctx = context
-	ex.init()
+  // Disabled until Odin fixes logger on web again.
+  //context.logger = log.create_console_logger()
+  ctx = context
+  ex.init()
 }
 
-@export
+@(export)
 step :: proc(dt: f64) -> bool {
-	context = ctx
-	return ex.step()
+  context = ctx
+  return ex.step()
 }
+
+// Make game use good GPU on laptops.
+@(export)
+NvOptimusEnablement: u32 = 1
+@(export)
+AmdPowerXpressRequestHighPerformance: i32 = 1
