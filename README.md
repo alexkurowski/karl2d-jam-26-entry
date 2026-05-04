@@ -4,7 +4,7 @@
 
 This game was made in two days for a weekend gamejam.
 
-(Play on itch.io)[https://some-xor.itch.io/reach-the-castle]
+[Play on itch.io](https://some-xor.itch.io/reach-the-castle)
 
 # Dependencies
 
