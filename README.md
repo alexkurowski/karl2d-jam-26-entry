@@ -1,6 +1,7 @@
 # Karl 2d gamejam entry
 
 ![Reach the castle](https://img.itch.zone/aW1nLzI3MDQ1MTY2LnBuZw==/315x250%23c/MhmB%2Fa.png)
+![Gameplay](https://img.itch.zone/aW1hZ2UvNDUzNzMwNC8yNzA0NjI2MC5wbmc=/original/HT8smp.png)
 
 This game was made in two days for a weekend gamejam.
 
