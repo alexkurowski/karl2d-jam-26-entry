@@ -283,6 +283,18 @@ Game_start_new_game :: proc() {
     g.player.position = possible_positions[0]
     Tile_reveal(g.player.position.x, g.player.position.y)
     Tile_clear(g.player.position.x, g.player.position.y)
+
+    // Fix if player surrounded by water
+    px, py := g.player.position.x, g.player.position.y
+    if Tile_is_water(px - 1, py) &&
+       Tile_is_water(px + 1, py) &&
+       Tile_is_water(px, py - 1) &&
+       Tile_is_water(px, py + 1) {
+      if Tile_is_valid(px - 1, py) do g.tiles[px - 1][py].kind = .Grass0
+      if Tile_is_valid(px + 1, py) do g.tiles[px + 1][py].kind = .Grass0
+      if Tile_is_valid(px, py - 1) do g.tiles[px][py - 1].kind = .Grass0
+      if Tile_is_valid(px, py + 1) do g.tiles[px][py + 1].kind = .Grass0
+    }
   }
   {
     // Place castle opposite of player
@@ -384,32 +396,27 @@ EntityKind :: enum {
 
 Entity_generate :: proc() {
   clear(&g.entities)
-  for n := 0; n < 4; n += 1 {
-    top: i32 = n == 0 ? 14 : 10
-    for i := i32(1); i <= top; i += 1 {
-      if i < 8 {
-        append(&g.entities, Entity{.Enemy1, i, false})
-        append(&g.entities, Entity{.Enemy1, i, false})
-        append(&g.entities, Entity{.Enemy1, i, false})
-        append(&g.entities, Entity{.Enemy1, i, false})
-      }
-      if i >= 4 {
-        append(&g.entities, Entity{.Enemy2, i, false})
-        append(&g.entities, Entity{.Enemy2, i, false})
-        append(&g.entities, Entity{.Enemy2, i, false})
-      }
-      if i >= 8 {
-        append(&g.entities, Entity{.Enemy3, i, false})
-        append(&g.entities, Entity{.Enemy3, i, false})
-      }
-      if i <= 10 {
-        append(&g.entities, Entity{.Weapon, i, false})
-        append(&g.entities, Entity{.Armor, i, false})
-        append(&g.entities, Entity{.Armor, i, false})
-        append(&g.entities, Entity{.Heal, i, false})
-        append(&g.entities, Entity{.Heal, i, false})
-      }
-      append(&g.entities, Entity{.Loot, i, false})
+  for i := i32(1); i <= 14; i += 1 {
+    if i < 6 {
+      append(&g.entities, Entity{.Enemy1, i, false})
+      append(&g.entities, Entity{.Enemy1, i, false})
+    }
+    if i >= 4 && i <= 10 {
+      append(&g.entities, Entity{.Enemy2, i, false})
+      append(&g.entities, Entity{.Enemy2, i, false})
+    }
+    if i >= 8 {
+      append(&g.entities, Entity{.Enemy3, i, false})
+      append(&g.entities, Entity{.Enemy3, i, false})
+    }
+    if i <= 10 {
+      append(&g.entities, Entity{.Weapon, i, false})
+      append(&g.entities, Entity{.Armor, i, false})
+      append(&g.entities, Entity{.Heal, i, false})
+      append(&g.entities, Entity{.Heal, i, false})
+    }
+    append(&g.entities, Entity{.Loot, i, false})
+    if i <= 8 {
       append(&g.entities, Entity{.Loot, i, false})
     }
   }
